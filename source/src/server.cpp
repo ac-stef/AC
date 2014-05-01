@@ -3,7 +3,12 @@
 
 #include "cube.h"
 
+#ifdef STANDALONE
 #define DEBUGCOND (true)
+#else
+VARP(serverdebug, 0, 0, 1);
+#define DEBUGCOND (serverdebug==1)
+#endif
 
 #include "server.h"
 #include "servercontroller.h"
@@ -492,10 +497,10 @@ const char *getDemoFilename(int gmode, int mplay, int mdrop, int tstamp, char *s
     // %w : timestamp "when"
     static string dmofn;
     copystring(dmofn, "");
-    
+
     int cc = 0;
     int mc = strlen(DEMOFORMAT);
-    
+
     while(cc<mc)
     {
         switch(DEMOFORMAT[cc])
@@ -2795,7 +2800,7 @@ void process(ENetPacket *packet, int sender, int chan)
             DEBUGVAR(cl->name);
             ASSERT(type>=0 && type<SV_NUM);
             DEBUGVAR(messagenames[type]);
-            protocoldebug(true);
+            protocoldebug(DEBUGCOND);
         }
         else protocoldebug(false);
         #endif

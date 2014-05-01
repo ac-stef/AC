@@ -165,7 +165,7 @@ inline bool issimilar (char s, char d)
 inline bool validmapname(char *s)
 {
     if(strlen(s) > MAXMAPNAMELEN) return false;
-    while(*s != '\0') 
+    while(*s != '\0')
     {
         if(!isalnum(*s) && *s != '_' && *s != '-' && *s != '.') return false;
         ++s;
@@ -423,9 +423,9 @@ template <class T> struct vector
     bool inrange(size_t i) const { return i<size_t(ulen); }
     bool inrange(int i) const { return i>=0 && i<ulen; }
 
-    T &pop() { return buf[--ulen]; }
-    T &last() { return buf[ulen-1]; }
-    void drop() { buf[--ulen].~T(); }
+    T &pop() { ASSERT(ulen > 0); return buf[--ulen]; }
+    T &last() { ASSERT(ulen > 0); return buf[ulen-1]; }
+    void drop() { ASSERT(ulen > 0); buf[--ulen].~T(); }
     bool empty() const { return ulen==0; }
 
     int capacity() const { return alen; }
@@ -433,8 +433,8 @@ template <class T> struct vector
     T &operator[](int i) { ASSERT(i>=0 && i<ulen); return buf[i]; }
     const T &operator[](int i) const { ASSERT(i >= 0 && i<ulen); return buf[i]; }
 
-    void shrink(int i)         { ASSERT(i<=ulen); while(ulen>i) drop(); }
-    void setsize(int i) { ASSERT(i<=ulen); ulen = i; }
+    void shrink(int i)         { ASSERT(i>=0 && i<=ulen); while(ulen>i) drop(); }
+    void setsize(int i) { ASSERT(i>=0 && i<=ulen); ulen = i; }
 
     void deletecontents() { while(!empty()) delete   pop(); }
     void deletearrays() { while(!empty()) delete[] pop(); }
