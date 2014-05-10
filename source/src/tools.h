@@ -162,7 +162,7 @@ inline bool issimilar (char s, char d)
 }
 
 #define MAXMAPNAMELEN 64
-inline bool validmapname(char *s)
+inline bool validmapname(const char *s)
 {
     if(strlen(s) > MAXMAPNAMELEN) return false;
     while(*s != '\0')
