@@ -61,6 +61,7 @@ void drawctficon(float x, float y, float s, int col, int row, float ts, int alph
     }
 }
 
+VARP(votealpha, 0, 255, 255);
 void drawvoteicon(float x, float y, int col, int row, bool noblend)
 {
     static Texture *tex = NULL;
@@ -68,7 +69,7 @@ void drawvoteicon(float x, float y, int col, int row, bool noblend)
     if(tex)
     {
         if(noblend) glDisable(GL_BLEND);
-        else turn_on_transparency(); // if(transparency && !noblend)
+        else turn_on_transparency(votealpha); // if(transparency && !noblend)
         drawicon(tex, x, y, 240, col, row, 1/2.0f);
         if(noblend) glEnable(GL_BLEND);
     }
@@ -262,16 +263,16 @@ void loadcrosshair(char *c, char *name)
         }
         return;
     }
- 
+
     int n = -1;
- 
+
     for (int i = 0; i < CROSSHAIR_NUM; i++)
     {
        if(strcmp(crosshairnames[i], name) == 0) { n = i; break; }
     }
- 
+
     if (n < 0 || n >= CROSSHAIR_NUM) return;
- 
+
     crosshairs[n] = loadcrosshairtexture(c);
 }
 
@@ -997,23 +998,24 @@ void gl_drawhud(int w, int h, int curfps, int nquads, int curvert, bool underwat
         if(curvote && curvote->millis >= totalmillis && !(hidevote == 1 && curvote->localplayervoted && curvote->result == VOTE_NEUTRAL))
         {
             const int left = 20*2, top = VIRTH;
-            draw_textf("%s called a vote:", left, top+240, curvote->owner ? colorname(curvote->owner) : "");
-            draw_textf("%s", left, top+320, curvote->desc);
-            draw_textf("----", left, top+400);
-            draw_textf("%d yes vs. %d no", left, top+480, curvote->stats[VOTE_YES], curvote->stats[VOTE_NO]);
+            defformatstring(str)("%s called a vote:", curvote->owner ? colorname(curvote->owner) : "");
+            draw_text(str, left, top + 240, 255, 255, 255, votealpha);
+            draw_text(curvote->desc, left, top + 320, 255, 255, 255, votealpha);
+            draw_text("----", left, top + 400, 255, 255, 255, votealpha);
+            formatstring(str)("%d yes vs. %d no", curvote->stats[VOTE_YES], curvote->stats[VOTE_NO]);
+            draw_text(str, left, top + 480, 255, 255, 255, votealpha);
 
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            glColor4f(1.0f, 1.0f, 1.0f, (sinf(lastmillis/100.0f)+1.0f) / 2.0f);
             switch(curvote->result)
             {
                 case VOTE_NEUTRAL:
-                    drawvoteicon(left, top, 0, 0, true);
+                    drawvoteicon(left, top, 0, 0, false);
                     if(!curvote->localplayervoted)
-                        draw_textf("\f3press F1/F2 to vote yes or no", left, top+560);
+                        draw_text("\f3press F1/F2 to vote yes or no", left, top+560, 255, 255, 255, votealpha);
                     break;
                 default:
                     drawvoteicon(left, top, (curvote->result-1)&1, 1, false);
-                    draw_textf("\f3vote %s", left, top+560, curvote->result == VOTE_YES ? "PASSED" : "FAILED");
+                    formatstring(str)("\f3vote %s", curvote->result == VOTE_YES ? "PASSED" : "FAILED");
+                    draw_text(str, left, top + 560, 255, 255, 255, votealpha);
                     break;
             }
         }
@@ -1084,6 +1086,7 @@ void gl_drawhud(int w, int h, int curfps, int nquads, int curvert, bool underwat
             {
                 glMatrixMode(GL_MODELVIEW);
                 if (p->weaponsel->type!=GUN_GRENADE) p->weaponsel->renderstats();
+                else if (p->prevweaponsel->type==GUN_AKIMBO || p->prevweaponsel->type==GUN_PISTOL) p->weapons[p->akimbo ? GUN_AKIMBO : GUN_PISTOL]->renderstats();
                 else p->prevweaponsel->renderstats();
                 if(p->mag[GUN_GRENADE]) p->weapons[GUN_GRENADE]->renderstats();
                 glMatrixMode(GL_PROJECTION);

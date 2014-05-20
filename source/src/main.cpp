@@ -1123,6 +1123,8 @@ int main(int argc, char **argv)
 
     initlog("video: misc");
     SDL_WM_SetCaption("AssaultCube", NULL);
+    SDL_Surface *icon = IMG_Load("packages/misc/icon.bmp");
+    SDL_WM_SetIcon(icon, NULL);
     keyrepeat(false);
     SDL_ShowCursor(0);
 
@@ -1307,7 +1309,7 @@ int main(int argc, char **argv)
             // in the screenshot regardless of which frame buffer is current
             if (!minimized)
             {
-                gl_drawframe(screen->w, screen->h, fps<lowfps ? fps/lowfps : (fps>highfps ? fps/highfps : 1.0f), fps);           
+                gl_drawframe(screen->w, screen->h, fps<lowfps ? fps/lowfps : (fps>highfps ? fps/highfps : 1.0f), fps);
             }
             addsleep(0, "screenshot");
             needsautoscreenshot = false;

@@ -8,6 +8,7 @@ VARP(altconsize, 0, 0, 100);
 VARP(fullconsize, 0, 40, 100);
 VARP(consize, 0, 6, 100);
 VARP(confade, 0, 20, 60);
+VARP(conalpha, 0, 255, 255);
 VAR(conopen, 0, 0, 1);
 VAR(numconlines, 0, 0, 1);
 
@@ -68,7 +69,7 @@ struct console : consolebuffer<cline>
         {
             int idx = offset + numl-i-1;
             char *line = conlines[idx].line;
-            draw_text(line, CONSPAD+FONTH/3, y, 0xFF, 0xFF, 0xFF, 0xFF, -1, conwidth);
+            draw_text(line, CONSPAD+FONTH/3, y, 0xFF, 0xFF, 0xFF, fullconsole ? 0xFF : conalpha, -1, conwidth);
             int width, height;
             text_bounds(line, width, height, conwidth);
             y += height;
@@ -119,18 +120,14 @@ void conoutf(const char *s, ...)
 
 COMMANDF(strstr, "ss", (char *a, char *b) { intret(strstr(a, b) ? 1 : 0); });
 
-/** This is the 1.0.4 function
-    It will substituted by rendercommand_wip
-    I am putting this temporarily here because it is very difficult to chat in game with the current cursor behavior,
-    and chatting in this test period is extremelly important : Brahma */
 int rendercommand(int x, int y, int w)
 {
-    defformatstring(s)("# %s", cmdline.buf); /** I changed the symbol here to differentiate from the > (new talk symbol),
-                                             and make clear the console changed to the old players (like me) : Brahma */
+    const char *useprompt = cmdprompt ? cmdprompt : "#";
+    defformatstring(s)("%s %s", useprompt, cmdline.buf);
     int width, height;
     text_bounds(s, width, height, w);
     y -= height - FONTH;
-    draw_text(s, x, y, 0xFF, 0xFF, 0xFF, 0xFF, cmdline.pos>=0 ? cmdline.pos+2 : (int)strlen(s), w);
+    draw_text(s, x, y, 0xFF, 0xFF, 0xFF, 0xFF, cmdline.pos>=0 ? cmdline.pos + strlen(useprompt) + 1  : (int)strlen(s), w);
     return height;
 }
 
@@ -350,7 +347,7 @@ void mapmsg(char *s)
     filterrichtext(text, s);
     filterservdesc(text, text);
     copystring(hdr.maptitle, text, 128);
-    unsavededits = 1;
+    if(editmode) unsavededits++;
 }
 
 void getmapmsg(void)

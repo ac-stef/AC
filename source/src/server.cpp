@@ -30,7 +30,7 @@ killmessagesfile killmsgs;
 bool isdedicated = false;
 ENetHost *serverhost = NULL;
 
-int nextstatus = 0, servmillis = 0, lastfillup = 0;
+int laststatus = 0, servmillis = 0, lastfillup = 0;
 
 vector<client *> clients;
 vector<worldstate *> worldstates;
@@ -1260,19 +1260,24 @@ void arenacheck()
     loopv(clients)
     {
         client &c = *clients[i];
-        if(c.type==ST_EMPTY || !c.isauthed || !c.isonrightmap || team_isspect(c.team)) continue; /// TODO: simplify the team/state sysmtem, it is not smart to have SPECTATE in both, for example
-        if (c.state.lastspawn < 0 && (c.state.state==CS_DEAD || c.state.state==CS_SPECTATE))
-        {
-            dead = true;
-            lastdeath = max(lastdeath, c.state.lastdeath);
-        }
-        else if(c.state.state==CS_ALIVE)
+        if(c.type==ST_EMPTY || !c.isauthed || !c.isonrightmap || team_isspect(c.team)) continue;
+        if(c.state.state==CS_ALIVE || ((c.state.state==CS_DEAD || c.state.state==CS_SPECTATE) && c.state.lastspawn>=0))
         {
             if(!alive) alive = &c;
             else if(!m_teammode || alive->team != c.team) return;
         }
+        else if(c.state.state==CS_DEAD || c.state.state==CS_SPECTATE)
+        {
+            dead = true;
+            lastdeath = max(lastdeath, c.state.lastdeath);
+        }
     }
 
+    if(autoteam && m_teammode && mastermode != MM_MATCH)
+    {
+        int *ntc = numteamclients();
+        if((!ntc[0] || !ntc[1]) && (ntc[0] > 1 || ntc[1] > 1)) refillteams(true, FTR_AUTOTEAM);
+    }
     if(!dead || gamemillis < lastdeath + 500) return;
     items_blocked = true;
     sendf(-1, 1, "ri2", SV_ARENAWIN, alive ? alive->clientnum : -1);
@@ -1570,8 +1575,8 @@ int canspawn(client *c)   // beware: canspawn() doesn't check m_arena!
 {
     if(!c || c->type == ST_EMPTY || !c->isauthed || !team_isvalid(c->team) ||
         (c->type == ST_TCPIP && (c->state.lastdeath > 0 ? gamemillis - c->state.lastdeath : servmillis - c->connectmillis) < (m_arena ? 0 : (m_flags ? 5000 : 2000))) ||
-        (servmillis - c->connectmillis < 1000 + c->state.reconnections * 2000 &&
-          gamemillis > 10000 && totalclients > 3 && !team_isspect(c->team))) return SP_OK_NUM; // equivalent to SP_DENY
+        (c->type == ST_TCPIP && (servmillis - c->connectmillis < 1000 + c->state.reconnections * 2000 &&
+          gamemillis > 10000 && totalclients > 3 && !team_isspect(c->team)))) return SP_OK_NUM; // equivalent to SP_DENY
     if(!c->isonrightmap) return SP_WRONGMAP;
     if(mastermode == MM_MATCH && matchteamsize)
     {
@@ -3002,7 +3007,7 @@ void process(ENetPacket *packet, int sender, int chan)
             case SV_PRIMARYWEAP:
             {
                 int nextprimary = getint(p);
-                if(nextprimary<0 && nextprimary>=NUMGUNS) break;
+                if (nextprimary < 0 || nextprimary >= NUMGUNS) break;
                 cl->state.nextprimary = nextprimary;
                 break;
             }
@@ -3911,9 +3916,9 @@ void serverslice(uint timeout)   // main server update, called from cube main lo
         lastThrottleEpoch = serverhost->bandwidthThrottleEpoch;
     }
 
-    if(servmillis>nextstatus)   // display bandwidth stats, useful for server ops
+    if(servmillis - laststatus > 60 * 1000)   // display bandwidth stats, useful for server ops
     {
-        nextstatus = servmillis + 60 * 1000;
+        laststatus = servmillis;
         rereadcfgs();
         if(nonlocalclients || serverhost->totalSentData || serverhost->totalReceivedData)
         {
@@ -4133,6 +4138,7 @@ void localconnect()
     client &c = addclient();
     c.type = ST_LOCAL;
     c.role = CR_ADMIN;
+    c.salt = 0;
     copystring(c.hostname, "local");
     sendservinfo(c);
 }
