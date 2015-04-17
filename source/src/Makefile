@@ -136,6 +136,10 @@ MASTER_OBJS= \
 	command-standalone.o \
 	master-standalone.o
 
+CGZINFO_OBJS= \
+	stream-standalone.o \
+	cgzinfo-standalone.o
+
 ifeq ($(PLATFORM),SunOS)
 CLIENT_LIBS+= -lsocket -lnsl -lX11
 SERVER_LIBS+= -lsocket -lnsl
@@ -155,7 +159,7 @@ clean-enet: ../enet/Makefile
 	$(MAKE) -C ../enet/ clean
 
 clean:
-	-$(RM) $(CLIENT_PCH) $(CLIENT_OBJS) $(SERVER_OBJS) $(MASTER_OBJS) ac_client ac_server ac_master
+	-$(RM) $(CLIENT_PCH) $(CLIENT_OBJS) $(SERVER_OBJS) $(MASTER_OBJS) $(CGZINFO_OBJS) ac_client ac_server ac_master cgzinfo
 
 mrproper: clean ../enet/Makefile
 	$(MAKE) -C ../enet/ distclean
@@ -171,7 +175,7 @@ mrproper: clean ../enet/Makefile
 $(CLIENT_OBJS): CXXFLAGS += $(CLIENT_INCLUDES)
 $(CLIENT_OBJS): $(CLIENT_PCH)
 $(SERVER_OBJS): CXXFLAGS += $(SERVER_INCLUDES)
-$(filter-out $(SERVER_OBJS),$(MASTER_OBJS)): CXXFLAGS += $(SERVER_INCLUDES)
+$(filter-out $(SERVER_OBJS),$(MASTER_OBJS),$(CGZINFO_OBJS)): CXXFLAGS += $(SERVER_INCLUDES)
 
 ifneq (,$(findstring MINGW,$(PLATFORM)))
 client: $(CLIENT_OBJS)
@@ -195,6 +199,8 @@ server: libenet $(SERVER_OBJS)
 	$(CXX) $(CXXFLAGS) -o ac_server $(SERVER_OBJS) $(SERVER_LIBS)
 master: libenet $(MASTER_OBJS)
 	$(CXX) $(CXXFLAGS) -o ac_master $(MASTER_OBJS) $(SERVER_LIBS)
+cgzinfo: $(CGZINFO_OBJS)
+	$(CXX) $(CXXFLAGS) -o cgzinfo $(CGZINFO_OBJS) -lz
 
 client_install: client
 	install -d ../../bin_unix/
