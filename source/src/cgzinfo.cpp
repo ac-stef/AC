@@ -120,7 +120,7 @@ bool load_world(char *mname)
     if(gzread(f, &tmp, sizeof_baseheader) != sizeof_baseheader ||
        (strncmp(tmp.head, "CUBE", 4)!=0 && strncmp(tmp.head, "ACMP",4)!=0)) { printf("while reading map: header malformatted (1)\n"); gzclose(f); return false; }
     lilswap(&tmp.version, 4); // version, headersize, sfactor, numents
-    if(tmp.version > MAXMAPVERSION) { printf("this map requires a newer version of AssaultCube\n"); gzclose(f); return false; }
+    if(tmp.version > MAPVERSION) { printf("this map requires a newer version of AssaultCube\n"); gzclose(f); return false; }
     if(tmp.sfactor<SMALLEST_FACTOR || tmp.sfactor>LARGEST_FACTOR || tmp.numents > MAXENTITIES) { printf("\f3illegal map size\n"); gzclose(f); return false; }
     tmp.headersize = fixmapheadersize(tmp.version, tmp.headersize);
     int restofhead = min(tmp.headersize, sizeof_header) - sizeof_baseheader;
@@ -139,13 +139,15 @@ bool load_world(char *mname)
     }
     hdr = tmp;
     lilswap(&hdr.waterlevel, 1);
-    lilswap(&hdr.maprevision, 2);
+    lilswap(&hdr.maprevision, 4); // maprevision, ambient, flags, timestamp
+    bool oldentityformat = hdr.version < 10; // version < 10 have only 4 attributes and no scaling
 
     loopi(hdr.numents)
     {
         persistent_entity &e = ents.add();
-        gzread(f, &e, sizeof(persistent_entity));
+        gzread(f, &e, oldentityformat ? 12 : sizeof(persistent_entity));
         lilswap((short *)&e, 4);
+        if(!oldentityformat) lilswap(&e.attr5, 1);
     }
     delete[] world;
     setupworld(hdr.sfactor);
@@ -192,6 +194,37 @@ void printdump(const char *prefix, uchar *s, int len, bool addascii)
     }
 }
 
+const char *time2string(int itime)
+{
+    static string asciitime;
+    time_t t = (time_t) itime;
+    struct tm *timeinfo;
+    timeinfo = gmtime (&t);
+    strftime(asciitime, sizeof(string) - 1, "%c", timeinfo);
+    return asciitime;
+}
+
+uchar entscale[MAXENTTYPES][7] =
+{ // (no zeros allowed here!)
+    {  1,  1,  1,  1,  1,  1,  1 },  // deleted
+    {  1,  1,  1,  1,  1,  1,  1 },  // light
+    { 10,  1,  1,  1,  1,  1,  1 },  // playerstart
+    { 10,  1,  1,  1,  1,  1,  1 },  // pistol
+    { 10,  1,  1,  1,  1,  1,  1 },  // ammobox
+    { 10,  1,  1,  1,  1,  1,  1 },  // grenades
+    { 10,  1,  1,  1,  1,  1,  1 },  // health
+    { 10,  1,  1,  1,  1,  1,  1 },  // helmet
+    { 10,  1,  1,  1,  1,  1,  1 },  // armour
+    { 10,  1,  1,  1,  1,  1,  1 },  // akimbo
+    { 10,  1,  5,  1, 10,  1,  1 },  // mapmodel
+    {  1,  1,  1,  1,  1,  1,  1 },  // trigger
+    {  1,  1,  1,  1,  1,  1,  1 },  // ladder
+    { 10,  1,  1,  1,  1,  1,  1 },  // ctf-flag
+    {  1,  1,  1,  1,  1,  1,  1 },  // sound
+    { 10,  5,  5,  5,  1, 10,  1 },  // clip
+    { 10,  5,  5,  5,  1, 10,  1 }   // plclip
+};
+
 int main(int argc, char **argv)
 {
     bool dumpgeometry = false, listents = false, notextures = false;
@@ -211,20 +244,35 @@ int main(int argc, char **argv)
                "headersize: %d\n"
                "sfactor: %d\n"
                "numents: %d\n"
-               "waterlevel: %d\n"
+               "waterlevel: %g\n"
                "watercolor: %d %d %d %d\n"
                "maprevision: %d\n"
-               "ambient: 0x%06X\n",
-               hdr.version, hdr.headersize, hdr.sfactor, hdr.numents, hdr.waterlevel, hdr.watercolor[0], hdr.watercolor[1], hdr.watercolor[2], hdr.watercolor[3], hdr.maprevision, hdr.ambient);
+               "ambient: 0x%06X\n"
+               "flags: 0x%08X\n"
+               "timestamp: %d (%s)\n",
+               hdr.version,
+               hdr.headersize,
+               hdr.sfactor,
+               hdr.numents,
+               float(hdr.waterlevel) / (hdr.version >= 10 ? 10 : 1),
+               hdr.watercolor[0], hdr.watercolor[1], hdr.watercolor[2], hdr.watercolor[3],
+               hdr.maprevision,
+               hdr.ambient,
+               hdr.flags,
+               hdr.timestamp, time2string(hdr.timestamp));
         printdump("maptitle", (uchar *) hdr.maptitle, 128, true);
         printdump("texlists", (uchar *) hdr.texlists, 3*256, false);
-        printdump("reserved", (uchar *) hdr.reserved, sizeof(int) * 12, false);
+        printdump("reserved", (uchar *) hdr.reserved, sizeof(int) * 10, false);
         if(extrasize && extrabuf) printdump("headerextra", extrabuf, extrasize, true);
         const char *entnames[] = { "none?", "light", "playerstart", "pistol", "ammobox","grenades", "health", "helmet", "armour", "akimbo", "mapmodel", "trigger", "ladder", "ctf-flag", "sound", "clip", "plclip" };
         if(listents) loopv(ents)
         {
             entity &e = ents[i];
-            printf("entity: %d %d|%d|%d  %d %d %d %d %s\n", e.type, e.x, e.y, e.z, e.attr1, e.attr2, e.attr3, e.attr4, e.type >= 0 && e.type < MAXENTTYPES ? entnames[e.type] : "unknown");
+            int t = e.type < MAXENTTYPES ? e.type : NOTUSED;
+            if(hdr.version < 10) t = NOTUSED; // -> unscaled
+            printf("entity: %d %d|%d|%d  %g %g %g %g", e.type, e.x, e.y, e.z, float(e.attr1) / entscale[t][0], float(e.attr2) / entscale[t][1], float(e.attr3) / entscale[t][2], float(e.attr4) / entscale[t][3]);
+            if(hdr.version >= 10) printf(" %g %g %g", float(e.attr5) / entscale[t][4], float(e.attr6) / entscale[t][5], float(e.attr7) / entscale[t][6]);
+            printf(" %s\n", e.type < MAXENTTYPES ? entnames[e.type] : "unknown");
         }
         const char *cubetypes[] = {"SOLID", "CORNER", "FHF", "CHF", "SPACE"};
         if(dumpgeometry) loopi(cubicsize)
