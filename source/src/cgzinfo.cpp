@@ -238,7 +238,7 @@ int main(int argc, char **argv)
     }
     if(load_world(filename))
     {
-        printf("AC-MAP (%02X%02X%02X%02X) %c%c%c%c\n", hdr.head[0], hdr.head[1], hdr.head[2],
+        printf("AC-MAP (%02X%02X%02X%02X) %c%c%c%c  (cgzinfo version 0.2)\n", hdr.head[0], hdr.head[1], hdr.head[2],
             hdr.head[3], isalpha(hdr.head[0]) ? hdr.head[0] : '#', isalpha(hdr.head[1]) ? hdr.head[1] : '#', isalpha(hdr.head[2]) ? hdr.head[2] : '#', isalpha(hdr.head[3]) ? hdr.head[3] : '#');
         printf("version: %d\n"
                "headersize: %d\n"
@@ -274,13 +274,69 @@ int main(int argc, char **argv)
             if(hdr.version >= 10) printf(" %g %g %g", float(e.attr5) / entscale[t][4], float(e.attr6) / entscale[t][5], float(e.attr7) / entscale[t][6]);
             printf(" %s\n", e.type < MAXENTTYPES ? entnames[e.type] : "unknown");
         }
-        const char *cubetypes[] = {"SOLID", "CORNER", "FHF", "CHF", "SPACE"};
-        if(dumpgeometry) loopi(cubicsize)
+        const char *cubetypes[] = {"SOLID", "CORNER", "FHF", "CHF", "SPACE", "SEMISOLID" };
+        // geometry statistics first
+        int usedtypes[256] = { 0 }, usedtexs[256] = { 0 }, usedheights[256] = { 0 }, usedvdeltas[256] = { 0 }, usedtags[256] = { 0 }, usedtagclips = 0, usedtagplclips = 0;
+        short layout[32 * 32] = { 0 };
+        int reduct = sfactor - 5, smask = ssize - 1;
+        sqr *s = world;
+        loopi(cubicsize)
         {
-            sqr &s = world[i];
-            const char *cubetype = s.type >= 0 && s.type < SEMISOLID ? cubetypes[s.type] : "unknown";
-            if(notextures) printf("cube: type(%d) %d-%d vdelta(%d) tag(0x%02X)  %s\n", s.type, s.floor, s.ceil, s.vdelta, s.tag, cubetype);
-            else printf("cube: type(%d) %d-%d w(%d) f(%d) c(%d) u(%d) vdelta(%d) tag(0x%02X)  %s\n", s.type, s.floor, s.ceil, s.wtex, s.ftex, s.ctex, s.utex, s.vdelta, s.tag, cubetype);
+            usedtypes[s->type]++;
+            usedtexs[s->wtex]++;
+            if(s->type != SOLID)
+            {
+                usedtexs[s->utex]++;
+                usedtexs[s->ftex]++;
+                usedtexs[s->ctex]++;
+                usedheights[clamp(s->ceil - s->floor, 0, 255)]++;
+                if(s->tag)
+                {
+                    if(s->tag & TAGTRIGGERMASK) usedtags[s->tag & TAGTRIGGERMASK]++;
+                    if(s->tag & TAGCLIP) usedtagclips++;
+                    else if(s->tag & TAGPLCLIP) usedtagplclips++;
+                }
+                layout[((i & smask) >> reduct) + 32 * (i >> (2 * sfactor - 5))]++;
+            }
+            usedvdeltas[s->vdelta]++;
+            s++;
+        }
+        reduct = 2 * reduct - 2;
+        int offs = (1 << reduct) - 1;
+        loopi(32 * 32)
+        {
+            if(!(i & ~768) && i) printf("maplayout: -------- -------- -------- --------\n");
+            if(!(i & 31)) printf("maplayout: ");
+            printf("%c", "#*+  "[(layout[i] + offs) >> reduct]);
+            if((i & 7) == 7) printf("%c", (i & 31) == 31 ? '\n' : '|');
+        }
+        int unknowntypes = cubicsize;
+        loopi(MAXTYPE) unknowntypes -= usedtypes[i];
+        printf("total cubes: %d\n", cubicsize);
+        loopi(MAXTYPE) printf("%s cubes: %d\n", cubetypes[i], usedtypes[i]);
+        printf("cubes of unknown type: %d\n", unknowntypes);
+        printf("tag clipped cubes: %d\n"
+               "tag plclipped cubes: %d\n",
+               usedtagclips,
+               usedtagplclips);
+        int minheight = 255, maxheight = 0, maxvdelta = 0;
+        loopi(256) if(usedheights[i])
+        {
+            if(i < minheight) minheight = i;
+            if(i > maxheight) maxheight = i;
+        }
+        loopi(maxheight - minheight + 1) printf("cubes of height %d: %d\n", i, usedheights[minheight + i]);
+        loopi(256) if(usedvdeltas[i] && i > maxvdelta) maxvdelta = i;
+        loopi(maxvdelta + 1) printf("cubes with vdelta %d: %d\n", i, usedvdeltas[i]);
+        loopi(256) if(usedtags[i]) printf("cubes with tag %d: %d\n", i, usedtags[i]);
+        loopi(256) if(usedtexs[i]) printf("uses of texture slot #%d: %d\n", i, usedtexs[i]);
+        s = world;
+        if(dumpgeometry) loopi(cubicsize) // fully detailed geometry dump
+        {
+            const char *cubetype = s->type < SEMISOLID ? cubetypes[s->type] : "unknown";
+            if(notextures) printf("cube: type(%d) %d-%d vdelta(%d) tag(0x%02X)  %s\n", s->type, s->floor, s->ceil, s->vdelta, s->tag, cubetype);
+            else printf("cube: type(%d) %d-%d w(%d) f(%d) c(%d) u(%d) vdelta(%d) tag(0x%02X)  %s\n", s->type, s->floor, s->ceil, s->wtex, s->ftex, s->ctex, s->utex, s->vdelta, s->tag, cubetype);
+            s++;
         }
     }
     return EXIT_SUCCESS;
