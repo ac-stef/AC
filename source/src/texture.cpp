@@ -72,6 +72,7 @@ VARFP(texreduce, -1, 0, 3, initwarning("texture quality", INIT_LOAD));
 VARFP(trilinear, 0, 1, 1, initwarning("texture filtering", INIT_LOAD));
 VARFP(bilinear, 0, 1, 1, initwarning("texture filtering", INIT_LOAD));
 VARFP(aniso, 0, 0, 16, initwarning("texture filtering", INIT_LOAD));
+FVARF(texturelodbias, 0.0f, 0, 2.0f, initwarning("texture filtering", INIT_LOAD));
 
 int formatsize(GLenum format)
 {
@@ -151,6 +152,7 @@ void createtexture(int tnum, int w, int h, void *pixels, int clamp, bool mipmap,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp&2 ? GL_CLAMP_TO_EDGE : GL_REPEAT);
     if(hasAF && min(aniso, hwmaxaniso) > 0 && mipmap) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, min(aniso, hwmaxaniso));
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, bilinear ? GL_LINEAR : GL_NEAREST);
+    if(mipmap) glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -texturelodbias);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
         mipmap ?
             (trilinear ?
