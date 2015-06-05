@@ -14,6 +14,7 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
     if(dist<1.0f) return;
     int reach = light.attr1;
     int steps = (int)(reach*reach*1.6f/dist);
+    if(steps < 1) steps = 1;
     const int PRECBITS = 12;
     const float PRECF = 4096.0f;
     int x = (int)(lx*PRECF);
@@ -29,7 +30,25 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
         l /= LIGHTSCALE;
         stepl /= LIGHTSCALE;
 
-        if(light.attr3 || light.attr4)      // coloured light version, special case because most lights are white
+        if(light.attr1 < 0) // negative light: shadows (no fade, no flicker, no dynlights)
+        {
+            l = ((255 - light.attr2) << PRECBITS) / 255; // percentage to reduce the light to
+            stepl = ((1 << PRECBITS) - l) / steps;
+            int a = light.attr3 << PRECBITS, stepa = a / steps; // absolute value to subtract
+            loopi(steps)
+            {
+                sqr *s = S(x>>PRECBITS, y>>PRECBITS);
+                s->r = max(0, (l * s->r - a) >> PRECBITS);
+                s->g = max(0, (l * s->g - a) >> PRECBITS);
+                s->b = max(0, (l * s->b - a) >> PRECBITS);
+                if(SOLID(s)) return;
+                x += stepx;
+                y += stepy;
+                l += stepl;
+                a -= stepa;
+            }
+        }
+        else if(light.attr3 || light.attr4)      // coloured light version, special case because most lights are white
         {
             if(flicker)
             {
@@ -65,7 +84,7 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
                 stepb -= 25;
             }
         }
-        else        // white light, special optimized version
+        else        // white light, special optimized version (requires white light entities to be placed before colored lights, though)
         {
             if(flicker)
             {
@@ -88,7 +107,7 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
                 l -= stepl;
                 stepl -= 25;
             }
-            else loopi(steps)
+            else loopi(steps) // all white light: this will convert light to white in the whole affected area (r, g and b are the same value after this!)
             {
                 sqr *s = S(x>>PRECBITS, y>>PRECBITS);
                 s->r = s->g = s->b = min((l>>PRECBITS)+s->r, 255);
@@ -102,7 +121,7 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
     }
     else        // the old (white) light code, here for the few people with old video cards that don't support overbright
     {
-        loopi(steps)
+        if(light.attr1 > 0) loopi(steps)
         {
             sqr *s = S(x>>PRECBITS, y>>PRECBITS);
             int light = l>>PRECBITS;
@@ -117,7 +136,7 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
 
 void calclightsource(const persistent_entity &l, float fade = 1, bool flicker = true)
 {
-    int reach = l.attr1;
+    int reach = abs(l.attr1);
     int sx = l.x-reach;
     int ex = l.x+reach;
     int sy = l.y-reach;
@@ -202,10 +221,16 @@ void calclight()
 
     seedMT(ents.length() + hdr.maprevision);   // static seed -> nothing random here
 
-    loopv(ents)
+    loopv(ents) // lights first
     {
         entity &e = ents[i];
-        if(e.type==LIGHT) calclightsource(e);
+        if(e.type==LIGHT && e.attr1 > 0) calclightsource(e);
+    }
+
+    loopv(ents) // then shadows (shadows only subtract light)
+    {
+        entity &e = ents[i];
+        if(e.type==LIGHT && e.attr1 < 0) calclightsource(e);
     }
 
     popMT();   // undo the static seedMT() from above
