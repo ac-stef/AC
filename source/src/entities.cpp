@@ -205,6 +205,12 @@ void renderentities()
                 rendermodel("playermodels", ANIM_IDLE, -(int)textureload(skin)->id, 1.5f, o, 0, e.attr1 / ENTSCALE10 + 90, 0);
             }
         }
+        if(e.type == PARTICLE)
+        {
+            vec v(e.x, e.y, e.z);
+            int t = clamp((int)e.attr2, 0, 21), args[2] = { e.attr3, e.attr4 + 1 };
+            particle_emit(t, args, lastmillis, 0, v);
+        }
         if(editmode && i == closest && !stenciling)
         {
             switch(e.type)

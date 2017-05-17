@@ -448,7 +448,7 @@ const char *entnames[] =
     "none?",
     "light", "playerstart", "pistol", "ammobox","grenades",
     "health", "helmet", "armour", "akimbo",
-    "mapmodel", "trigger", "ladder", "ctf-flag", "sound", "clip", "plclip", "dummy", ""
+    "mapmodel", "trigger", "ladder", "ctf-flag", "sound", "clip", "plclip", "particle", "dummy", ""
 };
 
 // entity attribute scaling and wraparound definitions for mapformat 10
@@ -471,6 +471,7 @@ short entwraparound[MAXENTTYPES][7] =
     {  256,    0,    0,    0,    0,    0,    0 },  // sound
     {    0,    0,    0,    0,    0,    0,    4 },  // clip
     {    0,    0,    0,    0,    0,    0,    4 },  // plclip
+    {    0,    0,    0,    0,    0,    0,    0 },  // particle
     {    0,    0,    0,    0,    0,    0,    0 }   // dummy
 };
 
@@ -493,6 +494,7 @@ uchar entscale[MAXENTTYPES][7] =
     {  1,  1,  1,  1,  1,  1,  1 },  // sound
     { 10,  5,  5,  5,  1, 10,  1 },  // clip
     { 10,  5,  5,  5,  1, 10,  1 },  // plclip
+    {  1,  1,  1,  1,  1,  1,  1 },  // particle
     {  1,  1,  1,  1,  1,  1,  1 }   // dummy
 };
 
