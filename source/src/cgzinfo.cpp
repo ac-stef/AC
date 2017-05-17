@@ -75,7 +75,7 @@ void rldecodecubes(ucharbuf &f, sqr *s, int len, int version, bool silent) // ru
                 if(type<0 || type>=MAXTYPE)
                 {
                     if(!silent) printf("while reading map at %ld: type %d out of range\n", cubicsize - (e - s), type);
-                    f.overread();
+                    f.forceoverread();
                     continue;
                 }
                 sqrdefault(s);
@@ -147,7 +147,8 @@ bool load_world(char *mname)
         persistent_entity &e = ents.add();
         gzread(f, &e, oldentityformat ? 12 : sizeof(persistent_entity));
         lilswap((short *)&e, 4);
-        if(!oldentityformat) lilswap(&e.attr5, 1);
+        if(oldentityformat) e.attr5 = e.attr6 = e.attr7 = 0;
+        else lilswap(&e.attr5, 1);
     }
     delete[] world;
     setupworld(hdr.sfactor);
@@ -238,6 +239,7 @@ int main(int argc, char **argv)
     }
     if(load_world(filename))
     {
+        // header info
         printf("AC-MAP (%02X%02X%02X%02X) %c%c%c%c  (cgzinfo version 0.2)\n", hdr.head[0], hdr.head[1], hdr.head[2],
             hdr.head[3], isalpha(hdr.head[0]) ? hdr.head[0] : '#', isalpha(hdr.head[1]) ? hdr.head[1] : '#', isalpha(hdr.head[2]) ? hdr.head[2] : '#', isalpha(hdr.head[3]) ? hdr.head[3] : '#');
         printf("version: %d\n"
@@ -261,21 +263,9 @@ int main(int argc, char **argv)
                hdr.flags,
                hdr.timestamp, time2string(hdr.timestamp));
         printdump("maptitle", (uchar *) hdr.maptitle, 128, true);
-        printdump("texlists", (uchar *) hdr.texlists, 3*256, false);
-        printdump("reserved", (uchar *) hdr.reserved, sizeof(int) * 10, false);
-        if(extrasize && extrabuf) printdump("headerextra", extrabuf, extrasize, true);
-        const char *entnames[] = { "none?", "light", "playerstart", "pistol", "ammobox","grenades", "health", "helmet", "armour", "akimbo", "mapmodel", "trigger", "ladder", "ctf-flag", "sound", "clip", "plclip" };
-        if(listents) loopv(ents)
-        {
-            entity &e = ents[i];
-            int t = e.type < MAXENTTYPES ? e.type : NOTUSED;
-            if(hdr.version < 10) t = NOTUSED; // -> unscaled
-            printf("entity: %d %d|%d|%d  %g %g %g %g", e.type, e.x, e.y, e.z, float(e.attr1) / entscale[t][0], float(e.attr2) / entscale[t][1], float(e.attr3) / entscale[t][2], float(e.attr4) / entscale[t][3]);
-            if(hdr.version >= 10) printf(" %g %g %g", float(e.attr5) / entscale[t][4], float(e.attr6) / entscale[t][5], float(e.attr7) / entscale[t][6]);
-            printf(" %s\n", e.type < MAXENTTYPES ? entnames[e.type] : "unknown");
-        }
+
+        // geometry stats
         const char *cubetypes[] = {"SOLID", "CORNER", "FHF", "CHF", "SPACE", "SEMISOLID" };
-        // geometry statistics first
         int usedtypes[256] = { 0 }, usedtexs[256] = { 0 }, usedheights[256] = { 0 }, usedvdeltas[256] = { 0 }, usedtags[256] = { 0 }, usedtagclips = 0, usedtagplclips = 0;
         short layout[32 * 32] = { 0 };
         int reduct = sfactor - 5, smask = ssize - 1;
@@ -319,6 +309,26 @@ int main(int argc, char **argv)
                "tag plclipped cubes: %d\n",
                usedtagclips,
                usedtagplclips);
+
+        // binary chunks
+        printdump("texlists", (uchar *) hdr.texlists, 3*256, false);
+        printdump("reserved", (uchar *) hdr.reserved, sizeof(int) * 10, false);
+        if(extrasize && extrabuf) printdump("headerextra", extrabuf, extrasize, true);
+
+        // entities
+        const char *entnames[] = { "none?", "light", "playerstart", "pistol", "ammobox","grenades", "health", "helmet", "armour", "akimbo", "mapmodel", "trigger", "ladder", "ctf-flag", "sound", "clip", "plclip" };
+        if(listents) loopv(ents)
+        {
+            entity &e = ents[i];
+            int t = e.type < MAXENTTYPES && hdr.version >= 10 ? e.type : NOTUSED;
+            printf("entity: %d %d|%d|%d  %g %g %g %g %g %g %g %s\n",
+                   e.type, e.x, e.y, e.z,
+                   float(e.attr1) / entscale[t][0], float(e.attr2) / entscale[t][1], float(e.attr3) / entscale[t][2], float(e.attr4) / entscale[t][3],
+                   float(e.attr5) / entscale[t][4], float(e.attr6) / entscale[t][5], float(e.attr7) / entscale[t][6],
+                   e.type < MAXENTTYPES ? entnames[e.type] : "unknown");
+        }
+
+        // more geometry stats
         int minheight = 255, maxheight = 0, maxvdelta = 0;
         loopi(256) if(usedheights[i])
         {
@@ -330,8 +340,10 @@ int main(int argc, char **argv)
         loopi(maxvdelta + 1) printf("cubes with vdelta %d: %d\n", i, usedvdeltas[i]);
         loopi(256) if(usedtags[i]) printf("cubes with tag %d: %d\n", i, usedtags[i]);
         loopi(256) if(usedtexs[i]) printf("uses of texture slot #%d: %d\n", i, usedtexs[i]);
+
+        // fully detailed geometry dump
         s = world;
-        if(dumpgeometry) loopi(cubicsize) // fully detailed geometry dump
+        if(dumpgeometry) loopi(cubicsize)
         {
             const char *cubetype = s->type < SEMISOLID ? cubetypes[s->type] : "unknown";
             if(notextures) printf("cube: type(%d) %d-%d vdelta(%d) tag(0x%02X)  %s\n", s->type, s->floor, s->ceil, s->vdelta, s->tag, cubetype);
