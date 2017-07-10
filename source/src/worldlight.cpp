@@ -32,20 +32,20 @@ void lightray(float bx, float by, const persistent_entity &light, float fade = 1
 
         if(light.attr1 < 0) // negative light: shadows (no fade, no flicker, no dynlights)
         {
-            l = ((255 - light.attr2) << PRECBITS) / 255; // percentage to reduce the light to
-            stepl = ((1 << PRECBITS) - l) / steps;
-            int a = light.attr3 << PRECBITS, stepa = a / steps; // absolute value to subtract
+            steps = (steps * -reach) / dist; // round area
+            int degr = light.attr2 / 8;
+            l = ((255 - light.attr2) << PRECBITS) / 255 + steps * degr; // percentage to reduce the light to
+            int a = light.attr3 << PRECBITS; // absolute value to subtract
             loopi(steps)
             {
                 sqr *s = S(x>>PRECBITS, y>>PRECBITS);
-                s->r = max(0, (l * s->r - a) >> PRECBITS);
-                s->g = max(0, (l * s->g - a) >> PRECBITS);
-                s->b = max(0, (l * s->b - a) >> PRECBITS);
+                s->r = max((int)min(light.attr4, s->r), (l * s->r - a) >> PRECBITS);
+                s->g = max((int)min(light.attr4, s->g), (l * s->g - a) >> PRECBITS);
+                s->b = max((int)min(light.attr4, s->b), (l * s->b - a) >> PRECBITS);
                 if(SOLID(s)) return;
                 x += stepx;
                 y += stepy;
-                l += stepl;
-                a -= stepa;
+                l -= degr;
             }
         }
         else if(light.attr3 || light.attr4)      // coloured light version, special case because most lights are white
