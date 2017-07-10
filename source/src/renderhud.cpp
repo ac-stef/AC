@@ -439,57 +439,29 @@ void hudeditf(int type, const char *s, ...)
     hudmsgs.editline(type, sf);
 }
 
-bool insideradar(const vec &centerpos, float radius, const vec &o)
-{
-    if(showmap) return !o.reject(centerpos, radius);
-    return o.distxy(centerpos)<=radius;
-}
-
 bool isattacking(playerent *p) { return lastmillis-p->lastaction < 500; }
-
-vec getradarpos()
-{
-    float radarviewsize = VIRTH/6;
-    float overlaysize = radarviewsize*4.0f/3.25f;
-    return vec(VIRTW-10-VIRTH/28-overlaysize, 10+VIRTH/52, 0);
-}
 
 VARP(showmapbackdrop, 0, 0, 2);
 VARP(showmapbackdroptransparency, 0, 75, 100);
-VARP(radarheight, 5, 150, 500);
 
-void drawradar_showmap(playerent *p, int w, int h)
+extern GLuint minimaptex;
+
+void drawradar_showmap(playerent *p)
 {
     float minimapviewsize = 3*min(VIRTW,VIRTH)/4; //minimap default size
-    float halfviewsize = minimapviewsize/2.0f;
     float iconsize = radarentsize/0.2f;
-    glColor3f(1.0f, 1.0f, 1.0f);
-    glPushMatrix();
     bool spect3rd = p->spectatemode > SM_FOLLOW1ST && p->spectatemode <= SM_FOLLOW3RD_TRANSPARENT;
     playerent *d = spect3rd ? players[p->followplayercn] : p;
     int p_baseteam = p->team == TEAM_SPECT && spect3rd ? team_base(players[p->followplayercn]->team) : team_base(p->team);
-    extern GLuint minimaptex;
-    vec centerpos(VIRTW/2 , VIRTH/2, 0.0f);
+
+    glPushMatrix();
+    glTranslatef((VIRTW - minimapviewsize) / 2, (VIRTH - minimapviewsize) / 2, 0);
     if(showmapbackdrop)
     {
-        glDisable(GL_TEXTURE_2D);
-        if(showmapbackdrop==2) glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE_MINUS_SRC_COLOR);
-        loopi(2)
-        {
-            int cg = i?(showmapbackdrop==2?((int)(255*(100-showmapbackdroptransparency)/100.0f)):0):(showmapbackdrop==2?((int)(255*(100-showmapbackdroptransparency)/100.0f)):64);
-            int co = i?0:4;
-            glColor3ub(cg, cg, cg);
-            glBegin(GL_QUADS);
-            glVertex2f( centerpos.x - halfviewsize - co, centerpos.y + halfviewsize + co);
-            glVertex2f( centerpos.x + halfviewsize + co, centerpos.y + halfviewsize + co);
-            glVertex2f( centerpos.x + halfviewsize + co, centerpos.y - halfviewsize - co);
-            glVertex2f( centerpos.x - halfviewsize - co, centerpos.y - halfviewsize - co);
-            glEnd();
-        }
-        glColor3ub(255,255,255);
-        glEnable(GL_TEXTURE_2D);
+        float a = showmapbackdrop == 2 ? ((100 - showmapbackdroptransparency) / 100.0f) : 1.0f;
+        blendbox(0, 0, minimapviewsize, minimapviewsize, showmapbackdrop == 1, -1, NULL, &a);
     }
-    glTranslatef(centerpos.x - halfviewsize, centerpos.y - halfviewsize , 0);
+    glColor3f(1.0f, 1.0f, 1.0f);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
     quad(minimaptex, 0, 0, minimapviewsize, 0.0f, 0.0f, 1.0f);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -562,25 +534,36 @@ void drawradar_showmap(playerent *p, int w, int h)
     glPopMatrix();
 }
 
-void drawradar_vicinity(playerent *p, int w, int h)
+float _radardiameter = 4.2f;
+VARFP(radardiameter, 80, 100, 100, _radardiameter = (100.0f - radardiameter) * 0.05506f + 4.2f);
+VARP(radarheight, 5, 150, 500);
+VARP(radarheightsync, 0, 0, 2);
+
+int getradarpos()
+{
+    return VIRTW - 10 - VIRTH/28 - int(VIRTH / _radardiameter);
+}
+
+void drawradar_vicinity(playerent *p)
 {
     bool spect3rd = p->spectatemode > SM_FOLLOW1ST && p->spectatemode <= SM_FOLLOW3RD_TRANSPARENT;
     playerent *d = spect3rd ? players[p->followplayercn] : p;
     int p_baseteam = p->team == TEAM_SPECT && spect3rd ? team_base(players[p->followplayercn]->team) : team_base(p->team);
-    extern GLuint minimaptex;
     int gdim = max(clmapdims.xspan, clmapdims.yspan);
-    float radarviewsize = min(VIRTW,VIRTH)/5;
+    float radarheight_eff = (float)radarheight;
+    if(radarheightsync) radarheight_eff *= (radarheightsync == 2 && clentstats.hasflags ? clentstats.flagentdistance : gdim) / 100.0f; // autozoom
+    float radarviewsize = min(VIRTW,VIRTH) / _radardiameter;
     float halfviewsize = radarviewsize/2.0f;
     float iconsize = radarentsize/0.4f;
-    float scaleh = radarheight/(2.0f*gdim);
-    float scaled = radarviewsize/float(radarheight);
+    float scaleh = radarheight_eff/(2.0f*gdim);
+    float scaled = radarviewsize/radarheight_eff;
     float offd = fabs((clmapdims.yspan - clmapdims.xspan) / 2.0f);
     if(gdim < 1) { gdim = ssize/2; offd = 0; }
     float offx = gdim == clmapdims.yspan ? offd : 0;
     float offy = gdim == clmapdims.xspan ? offd : 0;
     vec rtr = vec(clmapdims.x1 - offx, clmapdims.y1 - offy, 0);
     vec rsd = vec(clmapdims.xm, clmapdims.ym, 0);
-    float d2s = radarheight * radarheight / 4.0f;
+    float d2s = radarheight_eff * radarheight_eff / 4.0f;
     glColor3f(1.0f, 1.0f, 1.0f);
     glPushMatrix();
     vec centerpos(VIRTW-halfviewsize-72, halfviewsize+64, 0);
@@ -685,13 +668,13 @@ void drawradar_vicinity(playerent *p, int w, int h)
     }
 }
 
-void drawradar(playerent *p, int w, int h)
+void drawradar(playerent *p)
 {
-    if(showmap) drawradar_showmap(p,w,h);
-    else drawradar_vicinity(p,w,h);
+    if(showmap) drawradar_showmap(p);
+    else drawradar_vicinity(p);
 }
 
-void drawteamicons(int w, int h, bool spect)
+void drawteamicons(bool spect)
 {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glColor3f(1, 1, 1);
@@ -735,7 +718,7 @@ VAR(blankouthud, 0, 0, 10000); //for "clean" screenshot
 string gtime;
 int dimeditinfopanel = 255;
 
-void gl_drawhud(int w, int h, int curfps, int nquads, int curvert, bool underwater, int elapsed)
+void gl_drawhud(int curfps, int nquads, int curvert, bool underwater, int elapsed)
 {
     if(blankouthud > 0) { blankouthud -= elapsed; return; }
     else blankouthud = 0;
@@ -806,11 +789,11 @@ void gl_drawhud(int w, int h, int curfps, int nquads, int curvert, bool underwat
     bool is_spect = (( player1->spectatemode==SM_FOLLOW1ST || player1->spectatemode==SM_FOLLOW3RD || player1->spectatemode==SM_FOLLOW3RD_TRANSPARENT ) &&
             players.inrange(player1->followplayercn) && players[player1->followplayercn]);
 
-    if(!hideradar || showmap) drawradar(p, w, h);
+    if(!hideradar || showmap) drawradar(p);
     if(!editmode)
     {
         glMatrixMode(GL_MODELVIEW);
-        if(!hideteam && m_teammode) drawteamicons(w, h, is_spect);
+        if(!hideteam && m_teammode) drawteamicons(is_spect);
         glMatrixMode(GL_PROJECTION);
     }
 

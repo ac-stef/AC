@@ -35,7 +35,7 @@ struct console : consolebuffer<cline>
 
     void render()
     {
-        int conwidth = (fullconsole ? VIRTW : int(floor(getradarpos().x)))*2 - 2*CONSPAD - 2*FONTH/3;
+        int conwidth = (fullconsole ? VIRTW : getradarpos())*2 - 2*CONSPAD - 2*FONTH/3;
         int h = VIRTH*2 - 2*CONSPAD - 2*FONTH/3;
         int conheight = min(fullconsole ? (h*(fullconsole==1 ? altconsize : fullconsize))/100 : FONTH*consize, h);
 

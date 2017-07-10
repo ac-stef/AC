@@ -300,7 +300,7 @@ void dot(int x, int y, float z)
     xtraverts += 4;
 }
 
-void blendbox(int x1, int y1, int x2, int y2, bool border, int tex, color *c)
+void blendbox(int x1, int y1, int x2, int y2, bool border, int tex, color *c, float *a)
 {
     glDepthMask(GL_FALSE);
     if(tex>=0)
@@ -366,7 +366,8 @@ void blendbox(int x1, int y1, int x2, int y2, bool border, int tex, color *c)
         else
         {
             glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
-            glColor3f(0.5f, 0.5f, 0.5f);
+            if(a) glColor3f(*a, *a, *a);
+            else glColor3f(0.5f, 0.5f, 0.5f);
         }
 
         glBegin(GL_TRIANGLE_STRIP);
@@ -1162,7 +1163,7 @@ void gl_drawframe(int w, int h, float changelod, float curfps, int elapsed)
     tagclipcubes.setsize(0);
 
     extern vector<vertex> verts;
-    gl_drawhud(w, h, int(curfps + 0.5f), nquads, verts.length(), underwater, elapsed);
+    gl_drawhud(int(curfps + 0.5f), nquads, verts.length(), underwater, elapsed);
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_FOG);

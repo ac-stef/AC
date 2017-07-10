@@ -384,7 +384,7 @@ extern void box(block &b, float z1, float z2, float z3, float z4);
 extern void box2d(int x1, int y1, int x2, int y2, int gray);
 extern void dot(int x, int y, float z);
 extern void linestyle(float width, int r, int g, int b);
-extern void blendbox(int x1, int y1, int x2, int y2, bool border, int tex = -1, color *c = NULL);
+extern void blendbox(int x1, int y1, int x2, int y2, bool border, int tex = -1, color *c = NULL, float *a = NULL);
 extern void quad(GLuint tex, float x, float y, float s, float tx, float ty, float tsx, float tsy = 0);
 extern void quad(GLuint tex, vec &c1, vec &c2, float tx, float ty, float tsx, float tsy);
 extern void circle(GLuint tex, float x, float y, float r, float tx, float ty, float tr, int subdiv = 32);
@@ -778,14 +778,14 @@ enum
 };
 extern int dimeditinfopanel;
 extern void damageblend(int n, void *p);
-extern void gl_drawhud(int w, int h, int curfps, int nquads, int curvert, bool underwater, int elapsed);
+extern void gl_drawhud(int curfps, int nquads, int curvert, bool underwater, int elapsed);
 extern void loadingscreen(const char *fmt = NULL, ...) PRINTFARGS(1, 2);
 extern void hudoutf(const char *s, ...) PRINTFARGS(1, 2);
 extern void hudonlyf(const char *s, ...) PRINTFARGS(1, 2);
 extern void hudeditf(int type, const char *s, ...) PRINTFARGS(2, 3);
 extern void show_out_of_renderloop_progress(float bar1, const char *text1, float bar2 = 0, const char *text2 = NULL);
 extern void updatedmgindicator(playerent *p, vec &attack);
-extern vec getradarpos();
+extern int getradarpos();
 
 // renderparticles
 enum
