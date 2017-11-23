@@ -812,6 +812,14 @@ VARF(mapoverride_nowaterreflect, 0, 0, 1, changemapflag(mapoverride_nowaterrefle
 VARF(mapoverride_limitwaveheight, 0, 0, 1, changemapflag(mapoverride_limitwaveheight, MHF_LIMITWATERWAVEHEIGHT));
 VARF(mapoverride_nostencilshadows, 0, 0, 1, changemapflag(mapoverride_nostencilshadows, MHF_DISABLESTENCILSHADOWS));
 VAR(_ignoreillegalpaths, 0, 0, 1);
+VAR(disconnectonmaperror, 0, 1, 1);
+
+extern void trydisconnect();
+
+void maperror()
+{
+    if(disconnectonmaperror && multiplayer(NULL)) trydisconnect();
+}
 
 extern char *mlayout;
 extern int Mv, Ma, Hhits;
@@ -922,7 +930,7 @@ int load_world(char *mname)        // still supports all map formats that have e
             e.attr##x = ov = e.attr##x * entscale[e.type][x - 1]; \
             if(ov != e.attr##x) { conoutf("overflow during conversion of attr%d of entity #%d (%s): value %d can no longer be represented - pls fix manually before saving the map",\
                                            x, i, entnames[e.type], oe.attr##x); e.attr##x = oe.attr##x; res |= LWW_ENTATTROVERFLOW; \
-                                  defformatstring(desc)("%s: attr%d was %d, value can no longer be represented", entnames[e.type], x, oe.attr##x); addtodoentity(i, desc); }
+                                  defformatstring(desc)("%s: attr%d was %d, value can no longer be represented", entnames[e.type], x, oe.attr##x); addtodoentity(i, desc); maperror(); }
             SCALEATTR(1);
             SCALEATTR(2);
             SCALEATTR(3);
